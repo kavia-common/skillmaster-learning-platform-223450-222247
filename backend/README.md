@@ -59,6 +59,10 @@ To call admin routes, send a Bearer token signed with `JWT_SECRET` and payload i
 
 JWT library: This project uses PyJWT (imported as `import jwt`). Ensure your environment installs dependencies via `pip install -r requirements.txt` and avoid creating any local file named `jwt.py` which would shadow the PyJWT package.
 
+Troubleshooting:
+- If you see `ModuleNotFoundError: No module named 'jwt'`, verify PyJWT is installed: `python -c "import jwt; print(jwt.__version__)"`. Reinstall deps if needed.
+- MongoDB deps: motor 3.6.0 requires `pymongo < 4.10 and >= 4.9`. We pin `pymongo==4.9.2` to satisfy this. If you change motor, adjust the pymongo pin accordingly.
+
 ## Existing prototype routes (in-memory)
 
 - Health
