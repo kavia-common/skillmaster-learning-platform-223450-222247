@@ -4,12 +4,25 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from bson import ObjectId  # type: ignore
 from pymongo import ASCENDING
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from src.db.models import LessonModel, SkillModel
+
+
+def _str_id(v: Any) -> Optional[str]:
+    """Helper to convert ObjectId or any truthy value to string id."""
+    if v is None:
+        return None
+    if isinstance(v, ObjectId):
+        return str(v)
+    try:
+        return str(v)
+    except Exception:
+        return None
 
 
 class MongoCatalogRepository:
@@ -61,16 +74,21 @@ class MongoCatalogRepository:
         return self._serialize_skill(doc) if doc else None
 
     async def create_skill(self, skill: SkillModel) -> Dict[str, Any]:
-        skill_dict = skill.model_dump(exclude_none=True)
+        # Use dict excluding the alias/id so Mongo can assign ObjectId
+        skill_dict = skill.model_dump(exclude_none=True, by_alias=True)
+        skill_dict.pop("_id", None)
         try:
             res = await self._skills.insert_one(skill_dict)
         except DuplicateKeyError as e:
             raise ValueError(f"Skill slug '{skill.slug}' already exists") from e
-        skill_dict["_id"] = str(res.inserted_id)
+        # Build response with id as string
+        skill_dict["_id"] = _str_id(res.inserted_id)
         return self._serialize_skill(skill_dict)
 
     async def update_skill(self, slug: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        updates["updatedAt"] = updates.get("updatedAt")
+        updates = dict(updates or {})
+        updates.pop("_id", None)
+        updates.pop("id", None)
         doc = await self._skills.find_one_and_update({"slug": slug}, {"$set": updates}, return_document=True)
         return self._serialize_skill(doc) if doc else None
 
@@ -89,15 +107,19 @@ class MongoCatalogRepository:
         return self._serialize_lesson(doc) if doc else None
 
     async def create_lesson(self, lesson: LessonModel) -> Dict[str, Any]:
-        lesson_dict = lesson.model_dump(exclude_none=True)
+        lesson_dict = lesson.model_dump(exclude_none=True, by_alias=True)
+        lesson_dict.pop("_id", None)
         try:
             res = await self._lessons.insert_one(lesson_dict)
         except DuplicateKeyError as e:
             raise ValueError(f"Lesson slug '{lesson.slug}' already exists") from e
-        lesson_dict["_id"] = str(res.inserted_id)
+        lesson_dict["_id"] = _str_id(res.inserted_id)
         return self._serialize_lesson(lesson_dict)
 
     async def update_lesson(self, slug: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        updates = dict(updates or {})
+        updates.pop("_id", None)
+        updates.pop("id", None)
         doc = await self._lessons.find_one_and_update({"slug": slug}, {"$set": updates}, return_document=True)
         return self._serialize_lesson(doc) if doc else None
 
@@ -110,7 +132,9 @@ class MongoCatalogRepository:
             return doc
         result = dict(doc)
         if "_id" in result:
-            result["_id"] = str(result["_id"])
+            # Also expose "id" for consumer convenience
+            result["_id"] = _str_id(result["_id"])
+            result["id"] = result["_id"]
         return result
 
     def _serialize_lesson(self, doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,5 +142,6 @@ class MongoCatalogRepository:
             return doc
         result = dict(doc)
         if "_id" in result:
-            result["_id"] = str(result["_id"])
+            result["_id"] = _str_id(result["_id"])
+            result["id"] = result["_id"]
         return result
