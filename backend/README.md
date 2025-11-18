@@ -57,6 +57,8 @@ Admin-only (JWT required; minimal stub):
 
 To call admin routes, send a Bearer token signed with `JWT_SECRET` and payload including `"role": "admin"`.
 
+JWT library: This project uses PyJWT (imported as `import jwt`). Ensure your environment installs dependencies via `pip install -r requirements.txt` and avoid creating any local file named `jwt.py` which would shadow the PyJWT package.
+
 ## Existing prototype routes (in-memory)
 
 - Health
