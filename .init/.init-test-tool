@@ -1,0 +1,4 @@
+{
+    "command": "pytest",
+    "working_directory": "/home/kavia/workspace/code-generation/skillmaster-learning-platform-223450-222247/backend"
+}
