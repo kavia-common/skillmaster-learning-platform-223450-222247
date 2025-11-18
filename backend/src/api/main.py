@@ -7,8 +7,10 @@ from src.api.errors import ApplicationError, application_error_handler, generic_
 from src.api.routers import lessons as lessons_router
 from src.api.routers import progress as progress_router
 from src.api.routers import skills as skills_router
+from src.api.routers import catalog as catalog_router
 from src.config import get_config
 from src.repositories.memory_repository import InMemoryRepository
+from src.db.mongo import init_mongo, close_mongo
 
 # Initialize app with metadata for OpenAPI/Swagger
 app = FastAPI(
@@ -45,10 +47,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Lifespan events for Mongo
+@app.on_event("startup")
+async def _on_startup() -> None:
+    # Initialize Mongo if env configured; if not, let seed/use log meaningful errors when needed
+    try:
+        await init_mongo()
+    except Exception:
+        # Start without Mongo; public in-memory endpoints still function
+        pass
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:
+    try:
+        await close_mongo()
+    except Exception:
+        pass
+
+
 # Register routers
 app.include_router(skills_router.router)
 app.include_router(lessons_router.router)
 app.include_router(progress_router.router)
+# New content routes backed by MongoDB
+app.include_router(catalog_router.router)
 
 # Error handlers
 app.add_exception_handler(ApplicationError, application_error_handler)

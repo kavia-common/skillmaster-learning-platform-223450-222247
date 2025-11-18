@@ -41,3 +41,8 @@ uvicorn==0.34.0
 uvloop==0.21.0
 watchfiles==1.0.5
 websockets==15.0.1
+# MongoDB async driver and tools
+motor==3.6.0
+pymongo==4.10.1
+# JWT auth
+PyJWT==2.10.1
