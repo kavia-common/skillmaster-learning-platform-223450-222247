@@ -6,6 +6,7 @@ Subject → Module → Lesson → Activity/Quiz and Progress tracking.
 
 Configuration:
 - Uses environment variable SQLALCHEMY_DATABASE_URL for the connection string.
+- For SQLite URLs, this module sets check_same_thread=False automatically for dev-friendly concurrency.
 - Do not hardcode secrets. Ensure .env provides SQLALCHEMY_DATABASE_URL.
 
 Typical usage:
