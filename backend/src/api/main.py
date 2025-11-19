@@ -38,10 +38,14 @@ repositories = {"default": InMemoryRepository()}
 app.state.repositories = repositories  # type: ignore[attr-defined]
 app.state.config = config  # type: ignore[attr-defined]
 
-# Configure CORS based on environment; default to permissive for dev
-allow_origins = ["*"]
+# Configure CORS based on environment; use explicit origins when credentials are enabled
+allow_origins = []
+# Always include localhost:3000 for local dev UI
+allow_origins.append("http://localhost:3000")
 if config.frontend_url:
-    allow_origins = [config.frontend_url]
+    allow_origins.append(config.frontend_url)
+# Dedupe and filter empties
+allow_origins = sorted({o.rstrip("/") for o in allow_origins if o})
 
 app.add_middleware(
     CORSMiddleware,
