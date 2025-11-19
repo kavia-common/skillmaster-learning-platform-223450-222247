@@ -3,6 +3,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.api.errors import ApplicationError, application_error_handler, generic_error_handler
 from src.api.routers import lessons as lessons_router
@@ -50,10 +51,11 @@ allow_origins = sorted({o.rstrip("/") for o in allow_origins if o})
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
-    allow_credentials=True,
+    allow_credentials=True,  # required so browser can send cookies/credentials
     allow_methods=["*"],
     allow_headers=["*"],
 )
+print("[CORS] allow_origins:", allow_origins, "allow_credentials=True")
 
 # Lifespan events for Mongo + relational schema + optional seeding
 @app.on_event("startup")
@@ -132,4 +134,59 @@ def health_check() -> Dict[str, Any]:
         "message": "Healthy",
         "env": config.node_env,
         "features": config.feature_flags,
+        "cors": {
+            "allow_origins": app.user_middleware[0].options.get("allow_origins", []) if app.user_middleware else [],
+            "allow_credentials": True,
+        },
     }
+
+
+# PUBLIC_INTERFACE
+@app.get(
+    "/__backend_help",
+    response_class=HTMLResponse,
+    tags=["Health"],
+    summary="Backend Help",
+    description="Quick links and environment diagnostics for local development and E2E checks.",
+)
+def backend_help() -> HTMLResponse:
+    """Developer helper page with links to common GET endpoints and seed trigger."""
+    html = f"""
+    <html><body style="font-family: system-ui; padding: 16px;">
+      <h1>SkillMaster Backend Help</h1>
+      <p>API base: <code>{os.getenv("BACKEND_URL","http://localhost:3001")}</code></p>
+      <h2>Quick links</h2>
+      <ul>
+        <li><a href="/docs" target="_blank">/docs</a></li>
+        <li><a href="/skills" target="_blank">/skills</a></li>
+        <li><a href="/content/skills" target="_blank">/content/skills</a></li>
+        <li><a href="/subjects" target="_blank">/subjects</a></li>
+        <li><a href="/modules?subject_id=1" target="_blank">/modules?subject_id=1</a></li>
+        <li><a href="/lessons?module_id=1" target="_blank">/lessons?module_id=1</a></li>
+      </ul>
+      <h2>Seeding</h2>
+      <p>Run seeds once to populate data:</p>
+      <pre>PYTHONPATH=backend python3 -m src.seeds.run_all_seeds</pre>
+      <p>Or invoke <a href="/__run_seeds" target="_blank">/__run_seeds</a> (synchronous call).</p>
+    </body></html>
+    """
+    return HTMLResponse(content=html, status_code=200)
+
+
+# PUBLIC_INTERFACE
+@app.get(
+    "/__run_seeds",
+    tags=["Internal"],
+    summary="Run all seeds",
+    description="Synchronously execute src.seeds.run_all_seeds to populate relational data for local development.",
+)
+def run_seeds_endpoint() -> JSONResponse:
+    """Invoke the seeding routine synchronously for local/dev convenience."""
+    try:
+        from src.seeds.run_all_seeds import run_all_seeds
+        run_all_seeds()
+        return JSONResponse({"ok": True, "message": "Seeds completed"}, status_code=200)
+    except SystemExit as e:
+        return JSONResponse({"ok": False, "message": f"Seeds exited: {e}"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"ok": False, "message": f"Error: {e}"}, status_code=500)
