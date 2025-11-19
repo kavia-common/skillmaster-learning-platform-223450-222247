@@ -19,3 +19,8 @@ quiz: [
   { "question": "...", "options": ["a","b","c","d"], "answerIndex": 0 },
   ...
 ] (exactly 3)
+
+AI Quiz generation and adaptive unlocking (relational-backed):
+- POST /ai/quiz/generate
+- GET /ai/quiz/lesson/{lesson_id}
+- POST /ai/quiz/submit

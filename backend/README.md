@@ -63,6 +63,9 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 3001 --reload
 
 Open API docs at: http://localhost:3001/docs
 
+AI Quiz:
+See README_OPENAI_QUIZ.md and docs/OPENAI_QUIZ.md for OpenAI configuration and endpoints.
+
 ## Environment variables
 
 Provide these in `.env`:

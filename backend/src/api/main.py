@@ -12,6 +12,7 @@ from src.api.routers import skills as skills_router
 from src.api.routers import catalog as catalog_router
 from src.api.routes import relational as relational_router
 from src.api.routers.skill_progressive import router as progressive_skills_router
+from src.api.routers import quiz_ai as quiz_ai_router
 from src.config import get_config
 from src.repositories.memory_repository import InMemoryRepository
 from src.db.mongo import init_mongo, close_mongo
@@ -117,6 +118,8 @@ app.include_router(lessons_router.router)
 app.include_router(progress_router.router)
 app.include_router(catalog_router.router)  # Mongo content
 app.include_router(relational_router.router)  # Relational CRUD
+# New: AI quiz router (generation, fetch, submit + adaptive unlocking)
+app.include_router(quiz_ai_router.router)
 
 # Error handlers
 app.add_exception_handler(ApplicationError, application_error_handler)
