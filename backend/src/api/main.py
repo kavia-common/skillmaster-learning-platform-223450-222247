@@ -8,6 +8,7 @@ from src.api.routers import lessons as lessons_router
 from src.api.routers import progress as progress_router
 from src.api.routers import skills as skills_router
 from src.api.routers import catalog as catalog_router
+from src.api.routes import relational as relational_router
 from src.config import get_config
 from src.repositories.memory_repository import InMemoryRepository
 from src.db.mongo import init_mongo, close_mongo
@@ -23,6 +24,7 @@ app = FastAPI(
         {"name": "Lessons", "description": "Per-module lessons browsing"},
         {"name": "Progress", "description": "User progress tracking"},
         {"name": "Internal", "description": "Internal utilities"},
+        {"name": "Relational", "description": "Relational CRUD for Subjects → Modules → Lessons → Activities/Quiz and Progress"},
     ],
 )
 
@@ -56,6 +58,13 @@ async def _on_startup() -> None:
     except Exception:
         # Start without Mongo; public in-memory endpoints still function
         pass
+    # Ensure relational tables exist (idempotent)
+    try:
+        from src.services.db_init_service import ensure_relational_schema
+        await ensure_relational_schema()
+    except Exception:
+        # Do not crash app if DB isn't configured; endpoints will surface errors when used
+        pass
 
 
 @app.on_event("shutdown")
@@ -72,6 +81,8 @@ app.include_router(lessons_router.router)
 app.include_router(progress_router.router)
 # New content routes backed by MongoDB
 app.include_router(catalog_router.router)
+# Relational CRUD routes
+app.include_router(relational_router.router)
 
 # Error handlers
 app.add_exception_handler(ApplicationError, application_error_handler)
