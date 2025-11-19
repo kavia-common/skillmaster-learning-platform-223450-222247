@@ -17,11 +17,10 @@ Notes:
 - Idempotent: Seeding can be safely re-run multiple times
 - Configuration: Uses environment variables read by backend config
 """
-import importlib
+import asyncio
 import logging
 import os
 import sys
-from typing import List, Tuple
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -30,89 +29,78 @@ logging.basicConfig(
 logger = logging.getLogger("seed_runner")
 
 
-def _import_seed(path: str):
-    """
-    Dynamically import a module by dotted path. Returns module or raises ImportError.
-    """
-    return importlib.import_module(path)
-
-
-def _run_callable(fn, name: str):
-    try:
-        logger.info("Running seed: %s", name)
-        fn()
-        logger.info("Completed seed: %s", name)
-    except Exception as e:
-        logger.exception("Seed failed: %s - %s", name, e)
-        raise
+def _safe_log_exc(label: str, e: Exception) -> None:
+    logger.exception("Seed step failed (%s): %s", label, e)
 
 
 # PUBLIC_INTERFACE
 def run_all_seeds() -> None:
-    """Run all available seeds in a deterministic order.
+    """Run all available seeds idempotently in a deterministic order.
 
-    - Ensures relational DB tables exist (safe, idempotent)
-    - Seeds initial relational data
-    - Seeds progressive skills and content if present
+    Steps:
+    1) Ensure relational tables exist (safe to re-run).
+    2) Seed progressive skills + minimal content.
+    3) Print entity counts.
+
+    Notes:
+    - This function is safe to call multiple times.
+    - It avoids optional content seeds that are not present to prevent noise.
     """
-    seed_steps: List[Tuple[str, str, str]] = [
-        # (module_path, callable_name, human_label)
-        ("src.db.table_init", "main", "Initialize relational tables"),
-        ("src.seeds.seed_initial_content", "run", "Seed initial relational content"),
-        ("src.seeds.seed_progressive_skills", "run", "Seed progressive skills"),
-    ]
-
-    # Optional: content seeds for /content/* (Mongo-like). If present, run.
-    # The backend README indicates /content/* endpoints exist; the seed file name may vary.
-    # We look up a scripts/seed_skills.py for content skills.
-    optional_seeds: List[Tuple[str, str, str]] = [
-        ("src.scripts.seed_skills", "main", "Seed content skills (Mongo-backed)"),
-    ]
-
     failures = 0
 
-    for module_path, callable_name, label in seed_steps:
-        try:
-            module = _import_seed(module_path)
-            fn = getattr(module, callable_name)
-            _run_callable(fn, label)
-        except ModuleNotFoundError:
-            logger.warning("Seed module not found: %s (skipping)", module_path)
-        except AttributeError:
-            logger.warning(
-                "Seed callable '%s' not found in %s (skipping)", callable_name, module_path
-            )
-        except Exception:
-            failures += 1
+    # 1) Initialize relational tables
+    try:
+        from src.db.table_init import create_all_tables
 
-    for module_path, callable_name, label in optional_seeds:
-        try:
-            module = _import_seed(module_path)
-            fn = getattr(module, callable_name)
-            _run_callable(fn, label)
-        except ModuleNotFoundError:
-            logger.info("Optional seed module not found: %s (skipping)", module_path)
-        except AttributeError:
-            logger.info(
-                "Optional seed callable '%s' not found in %s (skipping)",
-                callable_name,
-                module_path,
-            )
-        except Exception:
-            failures += 1
+        # create_all_tables is async-compatible; run in event loop
+        asyncio.run(create_all_tables())
+        logger.info("Relational tables initialized (or already existed).")
+    except Exception as e:
+        _safe_log_exc("Initialize relational tables", e)
+        failures += 1
+
+    # 2) Progressive skills and baseline relational content
+    try:
+        # Seed progressive skills (idempotent)
+        from src.seeds.seed_progressive_skills import run as run_progressive
+
+        run_progressive()
+        logger.info("Progressive skills seed completed.")
+    except Exception as e:
+        _safe_log_exc("Seed progressive skills", e)
+        failures += 1
+
+    # 3) Compute/print counts via seed_initial_content helper (does counting)
+    try:
+        from src.db.sqlalchemy import get_session_factory
+        from src.seeds.seed_initial_content import seed_initial_content
+
+        SessionFactory = get_session_factory()
+        with SessionFactory() as session:
+            counts = seed_initial_content(session)
+        logger.info(
+            "Seed complete: subjects=%s, skills=%s, modules=%s, lessons=%s, activities=%s, quizzes=%s",
+            counts.get("subjects"),
+            counts.get("skills"),
+            counts.get("modules"),
+            counts.get("lessons"),
+            counts.get("activities"),
+            counts.get("quizzes"),
+        )
+    except Exception as e:
+        _safe_log_exc("Finalize counts", e)
+        failures += 1
 
     if failures:
         raise SystemExit(f"Seeding completed with {failures} failure(s).")
+
     logger.info("All seeds completed successfully.")
-    return None
 
 
 if __name__ == "__main__":
-    # Allow invoking directly with python src/seeds/run_all_seeds.py
-    # but recommended is module form to ensure PYTHONPATH set.
     try:
         run_all_seeds()
-    except SystemExit as e:
+    except SystemExit:
         raise
     except Exception as e:
         logger.exception("Seeding crashed: %s", e)
