@@ -47,3 +47,14 @@ motor==3.6.0
 pymongo==4.9.2
 # JWT auth
 PyJWT==2.10.1
+
+# Relational DB support
+# SQLAlchemy core/ORM (sync engine used by src/db/sqlalchemy.py)
+SQLAlchemy==2.0.37
+# SQLite driver (sync) for local/dev defaults (sqlite:///)
+# Standard library's sqlite3 suffices; no extra package needed.
+# Postgres drivers (choose one depending on deployment):
+psycopg2-binary==2.9.9
+# Optional async drivers for future async migration (code currently uses sync engine):
+aiosqlite==0.20.0
+asyncpg==0.29.0

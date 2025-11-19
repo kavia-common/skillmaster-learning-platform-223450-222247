@@ -60,7 +60,9 @@ Open API docs at: http://localhost:3001/docs
 Provide these in `.env`:
 - MONGODB_URI=mongodb://<user>:<pass>@<host>:<port>/<db>?retryWrites=true&w=majority
 - JWT_SECRET=change-this-later
-- Optional: SQLALCHEMY_DATABASE_URL for relational hierarchy + progress (defaults to SQLite at ./skillmaster.db)
+- Optional: SQLALCHEMY_DATABASE_URL for relational hierarchy + progress
+  - Defaults to SQLite at `sqlite:///./skillmaster.db` if not set (sync engine).
+  - Example Postgres (sync): `postgresql+psycopg2://USER:PASSWORD@HOST:5432/DBNAME`
 
 Other optional frontend config variables are also supported as shown in `.env.example`.
 
@@ -74,6 +76,13 @@ python -m src.db.table_init
 ```
 
 This is idempotent and safe to run repeatedly.
+
+## SQLAlchemy & Drivers
+
+- The project uses SQLAlchemy 2.x with a synchronous engine (`create_engine`) in `src/db/sqlalchemy.py`.
+- Default DB URL is SQLite (sync) `sqlite:///./skillmaster.db` so no extra SQLite driver is required beyond stdlib.
+- For Postgres in production, set `SQLALCHEMY_DATABASE_URL=postgresql+psycopg2://...` and ensure `psycopg2-binary` is installed (pinned in requirements).
+- Async drivers (`aiosqlite`, `asyncpg`) are included for potential future async migration; current code uses sync sessions.
 
 ## Seeding initial content
 
