@@ -2,6 +2,41 @@
 
 FastAPI backend for the SkillMaster micro skill-based learning platform.
 
+## Relational Data Seeding
+
+This repository includes an idempotent seeding utility to populate Subjects → Modules → Lessons → Activities/Quizzes.
+
+Two ways to run the seed:
+
+1) CLI (recommended for local/dev)
+- Ensure your relational DB is configured via environment variables used by the existing SQLAlchemy integration.
+- Run:
+```
+cd backend
+python -m src.seeds.seed_initial_content
+```
+This will:
+- Ensure tables exist
+- Upsert subjects, modules, lessons, activities and quizzes
+- Be safe to re-run without creating duplicates
+
+2) Automatic on FastAPI startup
+Set the environment variable:
+```
+SEED_RELATIONAL_DATA=true
+```
+Then start your API server as usual. On startup, it will:
+- Ensure tables exist
+- Run the same idempotent seeding logic
+
+Notes:
+- The seed script relies on the relational models and SQLAlchemy session already configured in `src/db/sqlalchemy.py` and `src/db/relational_models.py`.
+- The seeding content includes:
+  - Subjects: Programming, Data Science, System Architecture, Soft Skills, Creative Tech
+  - Each subject has several modules
+  - Each module includes 1–2 lessons with 1–2 activities (content/video/coding)
+  - Each lesson has a short quiz (3 questions)
+
 ## Running locally
 
 - Ensure Python 3.11+

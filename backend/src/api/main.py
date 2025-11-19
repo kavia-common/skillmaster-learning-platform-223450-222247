@@ -1,4 +1,5 @@
 from typing import Any, Dict
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Lifespan events for Mongo
+# Lifespan events for Mongo + relational schema + optional seeding
 @app.on_event("startup")
 async def _on_startup() -> None:
     # Initialize Mongo if env configured; if not, let seed/use log meaningful errors when needed
@@ -60,10 +61,23 @@ async def _on_startup() -> None:
         pass
     # Ensure relational tables exist (idempotent)
     try:
-        from src.services.db_init_service import ensure_relational_schema
-        await ensure_relational_schema()
+        from src.db.table_init import create_all_tables
+        await create_all_tables()
     except Exception:
         # Do not crash app if DB isn't configured; endpoints will surface errors when used
+        pass
+
+    # Optionally run relational data seeding when enabled by env var
+    try:
+        if os.getenv("SEED_RELATIONAL_DATA", "false").lower() == "true":
+            from src.db.sqlalchemy import get_session_factory
+            from src.seeds.seed_initial_content import seed_initial_content
+
+            SessionFactory = get_session_factory()
+            with SessionFactory() as session:
+                seed_initial_content(session)
+    except Exception:
+        # Seeding is optional; avoid crashing on startup in constrained envs
         pass
 
 
