@@ -2,9 +2,9 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db
-from ..relational_schemas import SkillCreate, SkillRead, ModuleRead
-from ...db.relational_models import Skill, Subject, Module
+from src.api.dependencies import get_db
+from src.api.relational_schemas import SkillCreate, SkillRead, ModuleRead
+from src.db.relational_models import Skill, Subject, Module
 
 router = APIRouter(tags=["Skills"])
 
