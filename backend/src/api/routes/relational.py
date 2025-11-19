@@ -68,7 +68,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload, Session
@@ -306,7 +306,7 @@ def update_subject(subject_id: int, updates: Dict[str, Any]) -> SubjectRead:
     summary="Delete subject",
     description="Soft delete the subject (and cascade via FK set to CASCADE on children).",
 )
-def delete_subject(subject_id: int) -> None:
+def delete_subject(subject_id: int) -> Response:
     """Soft delete subject."""
     with db_session_scope() as session:
         entity = session.get(Subject, subject_id)
@@ -314,7 +314,8 @@ def delete_subject(subject_id: int) -> None:
             raise HTTPException(status_code=404, detail="Subject not found")
         entity.is_deleted = True
         session.flush()
-        return None
+        # Return explicit 204 No Content with empty body
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # PUBLIC_INTERFACE
@@ -471,7 +472,7 @@ def update_module(module_id: int, updates: Dict[str, Any]) -> ModuleRead:
     summary="Delete module",
     description="Soft delete module.",
 )
-def delete_module(module_id: int) -> None:
+def delete_module(module_id: int) -> Response:
     """Soft delete module."""
     with db_session_scope() as session:
         entity = session.get(Module, module_id)
@@ -479,7 +480,7 @@ def delete_module(module_id: int) -> None:
             raise HTTPException(status_code=404, detail="Module not found")
         entity.is_deleted = True
         session.flush()
-        return None
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # PUBLIC_INTERFACE
@@ -635,7 +636,7 @@ def update_lesson(lesson_id: int, updates: Dict[str, Any]) -> LessonRead:
     summary="Delete lesson",
     description="Soft delete lesson.",
 )
-def delete_lesson(lesson_id: int) -> None:
+def delete_lesson(lesson_id: int) -> Response:
     """Soft delete lesson."""
     with db_session_scope() as session:
         entity = session.get(Lesson, lesson_id)
@@ -643,7 +644,7 @@ def delete_lesson(lesson_id: int) -> None:
             raise HTTPException(status_code=404, detail="Lesson not found")
         entity.is_deleted = True
         session.flush()
-        return None
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # PUBLIC_INTERFACE
@@ -776,7 +777,7 @@ def update_activity(activity_id: int, updates: Dict[str, Any]) -> ActivityRead:
     summary="Delete activity",
     description="Soft delete activity.",
 )
-def delete_activity(activity_id: int) -> None:
+def delete_activity(activity_id: int) -> Response:
     """Soft delete activity."""
     with db_session_scope() as session:
         entity = session.get(Activity, activity_id)
@@ -784,7 +785,7 @@ def delete_activity(activity_id: int) -> None:
             raise HTTPException(status_code=404, detail="Activity not found")
         entity.is_deleted = True
         session.flush()
-        return None
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # Quizzes (alias on activities with type='quiz')
@@ -860,7 +861,7 @@ def update_quiz(quiz_id: int, updates: Dict[str, Any]) -> ActivityRead:
     summary="Delete quiz",
     description="Soft delete quiz activity.",
 )
-def delete_quiz(quiz_id: int) -> None:
+def delete_quiz(quiz_id: int) -> Response:
     """Delete quiz activity."""
     return delete_activity(quiz_id)
 
@@ -1016,7 +1017,7 @@ def get_progress(progress_id: int) -> ProgressRead:
     summary="Delete progress",
     description="Soft delete a progress record.",
 )
-def delete_progress(progress_id: int) -> None:
+def delete_progress(progress_id: int) -> Response:
     """Soft delete progress record."""
     with db_session_scope() as session:
         entity = session.get(Progress, progress_id)
@@ -1024,4 +1025,4 @@ def delete_progress(progress_id: int) -> None:
             raise HTTPException(status_code=404, detail="Progress not found")
         entity.is_deleted = True
         session.flush()
-        return None
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
