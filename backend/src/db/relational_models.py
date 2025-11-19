@@ -1,28 +1,25 @@
 """
-Relational SQLAlchemy models for Subject → Module → Lesson → Activity/Quiz and Progress.
+Relational SQLAlchemy models for Subject → Skill → Module → Lesson → Activity/Quiz and Progress.
 
 This layer complements the existing Mongo-backed catalog and supports
 normalized storage for the learning hierarchy. It defines:
 
+- Subject 1:N Skill
 - Subject 1:N Module
+- Skill 1:N Module (optional link per module via skill_id for progression grouping)
 - Module 1:N Lesson
-- Lesson 1:N Activity
-- Lesson 1:N Quiz (modeled as Activity subtype via 'type' and optional quiz fields)
-- Progress entries referencing lesson-level (and optionally activity-level) completion
+- Lesson 1:N Activity (type: content|quiz with optional quiz fields)
+- Progress entries referencing subject/module/lesson/activity
 
 All tables include:
 - id (surrogate key)
 - created_at, updated_at timestamps
-- is_deleted soft delete flag
+- soft delete flag (is_deleted)
 
 Notes:
 - Quiz is treated as a specialized Activity with question JSON payload
   (array of {"question","options":[...4 items...],"answerIndex":0-3}).
-- Use server_default timestamps for created_at, updated_at; app code should update updated_at on writes.
-
-Migrations:
-- This project doesn't have Alembic configured; provide a helper to create_all
-  consistent with project patterns. See src/db/table_init.py for init utility.
+- See src/db/table_init.py for table initialization helpers.
 """
 
 from __future__ import annotations
@@ -49,11 +46,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.sqlalchemy import Base
 
 
-def utcnow() -> datetime:
-    """Return UTC now; used for default python-side timestamps."""
-    return datetime.utcnow()
-
-
 class TimestampMixin:
     """Adds created/updated timestamps and soft delete flag."""
     created_at: Mapped[datetime] = mapped_column(
@@ -66,7 +58,7 @@ class TimestampMixin:
 
 
 class Subject(Base, TimestampMixin):
-    """Top-level subject grouping skills/modules."""
+    """Top-level subject (topic) grouping skills and modules."""
     __tablename__ = "subjects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -78,24 +70,51 @@ class Subject(Base, TimestampMixin):
     modules: Mapped[List["Module"]] = relationship(
         "Module", back_populates="subject", cascade="all, delete-orphan", lazy="selectin"
     )
+    skills: Mapped[List["Skill"]] = relationship(
+        "Skill", back_populates="subject", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("slug", name="uq_subject_slug"),
     )
 
 
+class Skill(Base, TimestampMixin):
+    """Skill is a progressive capability grouped under a Subject (topic)."""
+    __tablename__ = "skills"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_skill_slug"),
+        UniqueConstraint("subject_id", "level", name="uq_skill_subject_level"),
+        Index("ix_skill_subject", "subject_id"),
+        Index("ix_skill_level", "level"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    level: Mapped[str] = mapped_column(String(20), nullable=False)  # Beginner|Intermediate|Advanced
+    tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+    subject: Mapped["Subject"] = relationship("Subject", back_populates="skills")
+    modules: Mapped[List["Module"]] = relationship("Module", back_populates="skill")
+
+
 class Module(Base, TimestampMixin):
-    """A module under a subject."""
+    """A module under a subject; optionally linked to a skill for progression."""
     __tablename__ = "modules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_id: Mapped[Optional[int]] = mapped_column(ForeignKey("skills.id", ondelete="SET NULL"), nullable=True, index=True)
     slug: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     subject: Mapped["Subject"] = relationship("Subject", back_populates="modules")
+    skill: Mapped[Optional["Skill"]] = relationship("Skill", back_populates="modules")
     lessons: Mapped[List["Lesson"]] = relationship(
         "Lesson", back_populates="module", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -162,7 +181,7 @@ class Activity(Base, TimestampMixin):
 
 
 class Progress(Base, TimestampMixin):
-    """User progress entries (lesson or activity level)."""
+    """User progress entries (entity references optional; history preserved)."""
     __tablename__ = "progress"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -174,9 +193,6 @@ class Progress(Base, TimestampMixin):
 
     completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-
-    # Relationships (no backrefs needed for now)
-    # subject/module/lesson/activity relationships are optional since we keep history
 
     __table_args__ = (
         Index("ix_progress_user_lesson_activity", "user_id", "lesson_id", "activity_id"),

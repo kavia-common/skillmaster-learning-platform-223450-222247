@@ -4,7 +4,7 @@ FastAPI backend for the SkillMaster micro skill-based learning platform.
 
 ## Relational Data Seeding
 
-This repository includes an idempotent seeding utility to populate Subjects → Modules → Lessons → Activities/Quizzes.
+This repository includes an idempotent seeding utility to populate Subjects → Skills (Beginner/Intermediate/Advanced) → Modules → Lessons → Activities.
 
 Two ways to run the seed:
 
@@ -17,7 +17,7 @@ python -m src.seeds.seed_initial_content
 ```
 This will:
 - Ensure tables exist
-- Upsert subjects, modules, lessons, activities and quizzes
+- Upsert subjects, progressive skills, modules, lessons, and activities
 - Be safe to re-run without creating duplicates
 
 2) Automatic on FastAPI startup
@@ -29,13 +29,21 @@ Then start your API server as usual. On startup, it will:
 - Ensure tables exist
 - Run the same idempotent seeding logic
 
-Notes:
-- The seed script relies on the relational models and SQLAlchemy session already configured in `src/db/sqlalchemy.py` and `src/db/relational_models.py`.
-- The seeding content includes:
-  - Subjects: Programming, Data Science, System Architecture, Soft Skills, Creative Tech
-  - Each subject has several modules
-  - Each module includes 1–2 lessons with 1–2 activities (content/video/coding)
-  - Each lesson has a short quiz (3 questions)
+Seeded topics:
+- Subjects (topics): Digital, Communication, Career, Leadership, Creativity
+- For each, Skills (progression levels): Beginner → Intermediate → Advanced
+- Minimal content per skill (1 module, 1 lesson, 1 activity) to avoid empty states
+
+## New Endpoints (relational skills)
+
+- GET `/skills?subject_slug={topic}&level={Beginner|Intermediate|Advanced}` — list skills filtered by topic and level
+- POST `/skills` — create skill (body: SkillCreate)
+- GET `/skills/{skill_slug}` — get skill detail
+- PUT `/skills/{skill_slug}` — update skill fields
+- DELETE `/skills/{skill_slug}` — soft delete
+- GET `/skills/{skill_slug}/modules` — list modules under a given skill
+
+Existing catalog/content endpoints under `/content/*` remain available.
 
 ## Running locally
 
@@ -68,7 +76,7 @@ Other optional frontend config variables are also supported as shown in `.env.ex
 
 ## Initialize relational tables (optional)
 
-A relational schema is provided for Subjects → Modules → Lessons → Activities/Quiz and Progress.
+A relational schema is provided for Subjects → Skills → Modules → Lessons → Activities/Quiz and Progress.
 Create the tables locally (uses SQLALCHEMY_DATABASE_URL or defaults to SQLite):
 
 ```bash
@@ -79,21 +87,9 @@ This is idempotent and safe to run repeatedly.
 
 ## SQLAlchemy & Drivers
 
-- The project uses SQLAlchemy 2.x with a synchronous engine (`create_engine`) in `src/db/sqlalchemy.py`.
-- Default DB URL is SQLite (sync) `sqlite:///./skillmaster.db` so no extra SQLite driver is required beyond stdlib.
-- For Postgres in production, set `SQLALCHEMY_DATABASE_URL=postgresql+psycopg2://...` and ensure `psycopg2-binary` is installed (pinned in requirements).
-- Async drivers (`aiosqlite`, `asyncpg`) are included for potential future async migration; current code uses sync sessions.
-
-## Seeding initial content
-
-The project includes a seed script to populate initial skills and lessons (with quizzes and badges).
-
-```bash
-# Ensure MONGODB_URI is set in your environment or .env
-python scripts/seed_skills.py
-```
-
-The script is idempotent (upserts by slug) and prints inserted/updated counts.
+- The project uses SQLAlchemy 2.x with a synchronous engine in `src/db/sqlalchemy.py`.
+- Default DB URL is SQLite (sync) `sqlite:///./skillmaster.db`.
+- For Postgres in production, set `SQLALCHEMY_DATABASE_URL=postgresql+psycopg2://...` and ensure `psycopg2-binary` is installed.
 
 ## Content routes (Mongo-backed)
 
@@ -103,18 +99,10 @@ Public GET endpoints:
 - GET `/content/skills/{slug}/lessons` – Lessons for a skill
 - GET `/content/lessons/{slug}` – Lesson detail (includes quiz and badge)
 
-Admin-only (JWT required; minimal stub):
+Admin-only (JWT required):
 - POST `/content/skills`
 - PUT `/content/skills/{slug}`
 - DELETE `/content/skills/{slug}`
 - POST `/content/lessons`
 - PUT `/content/lessons/{slug}`
 - DELETE `/content/lessons/{slug}`
-
-To call admin routes, send a Bearer token signed with `JWT_SECRET` and payload including `"role": "admin"`.
-
-JWT library: This project uses PyJWT (imported as `import jwt`). Ensure your environment installs dependencies via `pip install -r requirements.txt` and avoid creating any local file named `jwt.py` which would shadow the PyJWT package.
-
-Troubleshooting:
-- If you see `ModuleNotFoundError: No module named 'jwt'`, verify PyJWT is installed: `python -c "import jwt; print(jwt.__version__)"`
-- MongoDB deps: motor 3.6.0 requires `pymongo < 4.10 and >= 4.9`. We pin `pymongo==4.9.2`.

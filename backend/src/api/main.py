@@ -10,6 +10,7 @@ from src.api.routers import progress as progress_router
 from src.api.routers import skills as skills_router
 from src.api.routers import catalog as catalog_router
 from src.api.routes import relational as relational_router
+from src.api.routers.skill_progressive import router as progressive_skills_router
 from src.config import get_config
 from src.repositories.memory_repository import InMemoryRepository
 from src.db.mongo import init_mongo, close_mongo
@@ -57,10 +58,8 @@ async def _on_startup() -> None:
     try:
         import sqlalchemy  # noqa: F401
     except Exception as e:
-        # Print clear guidance for CI logs
-        print("[Startup][WARNING] SQLAlchemy not available. Ensure 'SQLAlchemy==2.0.37' is installed via requirements.txt. Error:", e)
+        print("[Startup][WARNING] SQLAlchemy not available. Ensure dependencies are installed. Error:", e)
 
-    # Detect DB URL and provide driver guidance
     db_url = os.getenv("SQLALCHEMY_DATABASE_URL")
     if not db_url:
         print("[Startup][INFO] No SQLALCHEMY_DATABASE_URL set. Defaulting to SQLite at sqlite:///./skillmaster.db")
@@ -69,27 +68,19 @@ async def _on_startup() -> None:
             try:
                 import psycopg2  # noqa: F401
             except Exception:
-                print("[Startup][WARNING] Postgres URL detected but psycopg2-binary not importable. Install psycopg2-binary==2.9.9.")
-        elif db_url.startswith("sqlite"):
-            # Nothing needed; stdlib sqlite3 is used.
-            pass
+                print("[Startup][WARNING] Postgres URL detected but psycopg2-binary not importable.")
 
-    # Initialize Mongo if env configured; if not, let seed/use log meaningful errors when needed
     try:
         await init_mongo()
     except Exception:
-        # Start without Mongo; public in-memory endpoints still function
         pass
 
-    # Ensure relational tables exist (idempotent)
     try:
         from src.db.table_init import create_all_tables
         await create_all_tables()
     except Exception as e:
-        # Do not crash app if DB isn't configured; endpoints will surface errors when used
         print("[Startup][WARNING] Relational table initialization skipped due to error:", e)
 
-    # Optionally run relational data seeding when enabled by env var
     try:
         if os.getenv("SEED_RELATIONAL_DATA", "false").lower() == "true":
             from src.db.sqlalchemy import get_session_factory
@@ -99,7 +90,6 @@ async def _on_startup() -> None:
             with SessionFactory() as session:
                 seed_initial_content(session)
     except Exception as e:
-        # Seeding is optional; avoid crashing on startup in constrained envs
         print("[Startup][WARNING] Relational data seeding skipped due to error:", e)
 
 
@@ -112,13 +102,15 @@ async def _on_shutdown() -> None:
 
 
 # Register routers
+# Existing skills (Mongo-backed content) routes
 app.include_router(skills_router.router)
+# New progressive relational skills routes
+app.include_router(progressive_skills_router)
+# Other routes
 app.include_router(lessons_router.router)
 app.include_router(progress_router.router)
-# New content routes backed by MongoDB
-app.include_router(catalog_router.router)
-# Relational CRUD routes
-app.include_router(relational_router.router)
+app.include_router(catalog_router.router)  # Mongo content
+app.include_router(relational_router.router)  # Relational CRUD
 
 # Error handlers
 app.add_exception_handler(ApplicationError, application_error_handler)

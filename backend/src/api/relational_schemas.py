@@ -3,6 +3,8 @@ Pydantic schemas for the relational learning hierarchy.
 
 These schemas support list/detail endpoints and nested reads. They include timestamps
 and soft delete flags for admin/maintenance views but typically omit is_deleted on reads.
+
+Includes Skill concept with progression level and binding to Subject.
 """
 
 from __future__ import annotations
@@ -75,6 +77,20 @@ class SubjectRead(_BaseSchema):
     updated_at: datetime
 
 
+# PUBLIC_INTERFACE
+class SkillRead(_BaseSchema):
+    """Skill read model with progression level."""
+    id: int
+    subject_id: int
+    name: str
+    slug: str
+    description: Optional[str] = None
+    level: str
+    tags: Optional[List[str]] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 # Create/update payloads
 
 # PUBLIC_INTERFACE
@@ -86,6 +102,25 @@ class SubjectCreate(_BaseSchema):
 
 
 # PUBLIC_INTERFACE
+class SkillCreate(_BaseSchema):
+    """Create payload for a skill under a subject."""
+    subject_id: int = Field(..., description="Parent subject/topic id")
+    name: str = Field(..., description="Skill display name")
+    slug: str = Field(..., description="URL-safe slug")
+    description: Optional[str] = Field(None, description="Short description")
+    level: str = Field(..., description="Beginner|Intermediate|Advanced")
+    tags: Optional[List[str]] = Field(default=None, description="Tags")
+
+    @field_validator("level")
+    @classmethod
+    def validate_level(cls, v: str) -> str:
+        allowed = {"Beginner", "Intermediate", "Advanced"}
+        if v not in allowed:
+            raise ValueError("level must be one of Beginner|Intermediate|Advanced")
+        return v
+
+
+# PUBLIC_INTERFACE
 class ModuleCreate(_BaseSchema):
     """Create payload for a module."""
     subject_id: int
@@ -93,6 +128,7 @@ class ModuleCreate(_BaseSchema):
     title: str
     description: Optional[str] = None
     order_index: int = 0
+    skill_id: Optional[int] = Field(default=None, description="Optional link to skill for progression grouping")
 
 
 # PUBLIC_INTERFACE
