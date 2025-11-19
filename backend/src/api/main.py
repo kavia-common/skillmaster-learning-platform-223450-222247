@@ -151,23 +151,29 @@ def health_check() -> Dict[str, Any]:
 )
 def backend_help() -> HTMLResponse:
     """Developer helper page with links to common GET endpoints and seed trigger."""
+    frontend = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    api_base = os.getenv("BACKEND_URL", "http://localhost:3001").rstrip("/")
     html = f"""
     <html><body style="font-family: system-ui; padding: 16px;">
       <h1>SkillMaster Backend Help</h1>
-      <p>API base: <code>{os.getenv("BACKEND_URL","http://localhost:3001")}</code></p>
+      <p>Frontend origin: <code>{frontend}</code></p>
+      <p>API base: <code>{api_base}</code></p>
       <h2>Quick links</h2>
       <ul>
         <li><a href="/docs" target="_blank">/docs</a></li>
+        <li><a href="/" target="_blank">/ (health)</a></li>
         <li><a href="/skills" target="_blank">/skills</a></li>
         <li><a href="/content/skills" target="_blank">/content/skills</a></li>
         <li><a href="/subjects" target="_blank">/subjects</a></li>
         <li><a href="/modules?subject_id=1" target="_blank">/modules?subject_id=1</a></li>
         <li><a href="/lessons?module_id=1" target="_blank">/lessons?module_id=1</a></li>
+        <li><a href="/__run_seeds" target="_blank">/__run_seeds</a> (run seeds)</li>
       </ul>
+      <h2>CORS</h2>
+      <p>Ensure CORS allows origin <code>{frontend}</code> with <code>allow_credentials=True</code>.</p>
       <h2>Seeding</h2>
       <p>Run seeds once to populate data:</p>
       <pre>PYTHONPATH=backend python3 -m src.seeds.run_all_seeds</pre>
-      <p>Or invoke <a href="/__run_seeds" target="_blank">/__run_seeds</a> (synchronous call).</p>
     </body></html>
     """
     return HTMLResponse(content=html, status_code=200)
