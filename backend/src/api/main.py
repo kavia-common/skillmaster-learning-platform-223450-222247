@@ -124,21 +124,28 @@ app.add_exception_handler(Exception, generic_error_handler)
 
 
 @app.get("/", tags=["Health"], summary="Health Check", description="Returns a simple health check response.")
-def health_check() -> Dict[str, Any]:
-    """Health check endpoint.
-
-    Returns:
-        JSON response with a message and basic configuration indicators.
-    """
+def root_health_check() -> Dict[str, Any]:
+    """Health check response at root path for compatibility with existing consumers."""
     return {
         "message": "Healthy",
         "env": config.node_env,
         "features": config.feature_flags,
         "cors": {
-            "allow_origins": app.user_middleware[0].options.get("allow_origins", []) if app.user_middleware else [],
-            "allow_credentials": True,
+                "allow_origins": app.user_middleware[0].options.get("allow_origins", []) if app.user_middleware else [],
+                "allow_credentials": True,
         },
     }
+
+# PUBLIC_INTERFACE
+@app.get(
+    "/health",
+    tags=["Health"],
+    summary="Service health",
+    description="Lightweight service health endpoint that returns 200 OK when the API is up.",
+)
+def health_check() -> Dict[str, Any]:
+    """This endpoint is used by frontends and uptime checks to verify the API is running."""
+    return {"status": "ok", "service": "skillmaster-backend", "version": app.version}
 
 
 # PUBLIC_INTERFACE
