@@ -25,8 +25,20 @@ Open API docs at: http://localhost:3001/docs
 Provide these in `.env`:
 - MONGODB_URI=mongodb://<user>:<pass>@<host>:<port>/<db>?retryWrites=true&w=majority
 - JWT_SECRET=change-this-later
+- Optional: SQLALCHEMY_DATABASE_URL for relational hierarchy + progress (defaults to SQLite at ./skillmaster.db)
 
 Other optional frontend config variables are also supported as shown in `.env.example`.
+
+## Initialize relational tables (optional)
+
+A relational schema is provided for Subjects → Modules → Lessons → Activities/Quiz and Progress.
+Create the tables locally (uses SQLALCHEMY_DATABASE_URL or defaults to SQLite):
+
+```bash
+python -m src.db.table_init
+```
+
+This is idempotent and safe to run repeatedly.
 
 ## Seeding initial content
 
@@ -60,31 +72,5 @@ To call admin routes, send a Bearer token signed with `JWT_SECRET` and payload i
 JWT library: This project uses PyJWT (imported as `import jwt`). Ensure your environment installs dependencies via `pip install -r requirements.txt` and avoid creating any local file named `jwt.py` which would shadow the PyJWT package.
 
 Troubleshooting:
-- If you see `ModuleNotFoundError: No module named 'jwt'`, verify PyJWT is installed: `python -c "import jwt; print(jwt.__version__)"`. Reinstall deps if needed.
-- MongoDB deps: motor 3.6.0 requires `pymongo < 4.10 and >= 4.9`. We pin `pymongo==4.9.2` to satisfy this. If you change motor, adjust the pymongo pin accordingly.
-
-## Existing prototype routes (in-memory)
-
-- Health
-  - GET `/` – Service health
-
-- Skills
-  - GET `/skills` – List skills
-  - GET `/skills/{skill_id}` – Skill detail with modules/lessons
-  - GET `/skills/{skill_id}/modules` – Modules for a skill
-
-- Lessons
-  - GET `/modules/{module_id}/lessons` – Lessons for a module
-
-- Progress
-  - GET `/progress/{user_id}` – Aggregated progress for a user
-  - POST `/progress/complete` – Mark a lesson completed
-  - GET `/progress/{user_id}/lesson/{lesson_id}` – Progress entries for a lesson
-
-## Generating OpenAPI JSON
-
-```bash
-python -m src.api.generate_openapi
-```
-
-This writes `interfaces/openapi.json`.
+- If you see `ModuleNotFoundError: No module named 'jwt'`, verify PyJWT is installed: `python -c "import jwt; print(jwt.__version__)"`
+- MongoDB deps: motor 3.6.0 requires `pymongo < 4.10 and >= 4.9`. We pin `pymongo==4.9.2`.
